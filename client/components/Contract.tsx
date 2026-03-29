@@ -183,6 +183,8 @@ export default function ContractUI({ walletAddress, onConnect, isConnecting }: C
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("Account not found")) {
         setError("Account not found on Testnet. You need to fund it first!");
+      } else if (msg.includes("UnreachableCodeReached")) {
+        setError("This betting pool has already been initialized! You can find its status in the 'Pool Status' tab.");
       } else {
         setError(msg);
       }
@@ -206,6 +208,8 @@ export default function ContractUI({ walletAddress, onConnect, isConnecting }: C
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("Account not found")) {
         setError("Account not found on Testnet. You need to fund it first!");
+      } else if (msg.includes("UnreachableCodeReached")) {
+        setError("You have already joined this betting pool! Doubling down is not allowed by this contract.");
       } else {
         setError(msg);
       }
