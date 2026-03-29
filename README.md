@@ -1,6 +1,7 @@
 ![Betting Pool Mascot](assets/mascot.png)
 
 # Betting Pool
+<img width="1919" height="910" alt="image" src="https://github.com/user-attachments/assets/e154f28b-6152-4258-9d87-4faff96514ed" />
 
 ## Project Description
 Betting Pool is a decentralized prediction and wagering platform built on the Stellar network using Soroban. It provides a transparent and trustless environment for users to participate in various betting pools. By leveraging smart contracts, the platform ensures that all rules are executed automatically and immutably, eliminating the need for centralized intermediaries. Users can create permissionless pools, set ticket prices, and join existing ones with confidence, knowing that every transaction is recorded on-chain. This project brings fairness and accessibility to the world of social wagering, empowering participants worldwide through blockchain technology.
