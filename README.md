@@ -19,3 +19,5 @@ Our vision is to revolutionize social wagering by providing an immutable and ope
 - **Dynamic Odds**: Support for variable betting amounts and dynamic odds calculation.
 
 ## Contract Deployment Details:
+- **Contract ID**: CBN57JBGP325YVQMVOKFOV5MIIVGOESMUEOZ5T6EZYCUHWAJRPDICOH6
+- **Contract Screenshot**: <img width="1908" height="883" alt="image" src="https://github.com/user-attachments/assets/e6441cc2-8044-45af-827f-5e624509ae45" />
