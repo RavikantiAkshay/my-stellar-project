@@ -26,7 +26,7 @@ import {
 
 /** Your deployed Soroban contract ID */
 export const CONTRACT_ADDRESS =
-  "CDJVMAX34YRCQ5JFC6SIOQOVSUY6XWEFYJOLF3SBCKU7CMI3IAP6HPWN";
+  "CBN57JBGP325YVQMVOKFOV5MIIVGOESMUEOZ5T6EZYCUHWAJRPDICOH6";
 
 /** Network passphrase (testnet by default) */
 export const NETWORK_PASSPHRASE = Networks.TESTNET;
@@ -212,57 +212,56 @@ export function toScValBool(value: boolean): xdr.ScVal {
 }
 
 // ============================================================
-// Supply Chain Tracker — Contract Methods
+// Betting Pool — Contract Methods
 // ============================================================
 
 /**
- * Add a product to the supply chain.
- * Calls: add_product(product_id: String, origin: String)
+ * Initialize a new betting pool.
+ * Calls: create_pool(description: String, ticket_price: u128)
  */
-export async function addProduct(
+export async function createPool(
   caller: string,
-  productId: string,
-  origin: string
+  description: string,
+  ticketPrice: bigint
 ) {
   return callContract(
-    "add_product",
-    [toScValString(productId), toScValString(origin)],
+    "create_pool",
+    [toScValString(description), nativeToScVal(ticketPrice, { type: "u128" })],
     caller,
     true
   );
 }
 
 /**
- * Update a product's status.
- * Calls: update_status(product_id: String, new_status: String)
+ * Place a bet (join the pool).
+ * Calls: place_bet(participant: Address)
  */
-export async function updateProductStatus(
+export async function placeBet(
   caller: string,
-  productId: string,
-  newStatus: string
+  participant: string
 ) {
   return callContract(
-    "update_status",
-    [toScValString(productId), toScValString(newStatus)],
+    "place_bet",
+    [toScValAddress(participant)],
     caller,
     true
   );
 }
 
 /**
- * Get product details (read-only).
- * Calls: get_product(product_id: String) -> Map<Symbol, String>
- * Returns: { origin: string, status: string } or null
+ * Close the pool (admin only).
+ * Calls: close_pool()
  */
-export async function getProduct(
-  productId: string,
-  caller?: string
-) {
-  return readContract(
-    "get_product",
-    [toScValString(productId)],
-    caller
-  );
+export async function closePool(caller: string) {
+  return callContract("close_pool", [], caller, true);
+}
+
+/**
+ * Get pool status (read-only).
+ * Calls: view_pool_status() -> PoolStatus
+ */
+export async function getPoolStatus(caller?: string) {
+  return readContract("view_pool_status", [], caller);
 }
 
 export { nativeToScVal, scValToNative, Address, xdr };

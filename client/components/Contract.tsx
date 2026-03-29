@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
-  addProduct,
-  updateProductStatus,
-  getProduct,
+  createPool,
+  placeBet,
+  getPoolStatus,
   CONTRACT_ADDRESS,
 } from "@/hooks/contract";
 import { AnimatedCard } from "@/components/ui/animated-card";
@@ -23,33 +23,30 @@ function SpinnerIcon() {
   );
 }
 
-function PackageIcon() {
+function PoolIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16.5 9.4 7.55 4.24" />
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <polyline points="3.29 7 12 12 20.71 7" />
-      <line x1="12" y1="22" x2="12" y2="12" />
+      <circle cx="12" cy="12" r="10" />
+      <path d="M16 12a4 4 0 0 1-8 0" />
     </svg>
   );
 }
 
-function RefreshIcon() {
+function BetIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-      <path d="M8 16H3v5" />
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
     </svg>
   );
 }
 
-function SearchIcon() {
+function ChartIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
     </svg>
   );
 }
@@ -118,17 +115,16 @@ function MethodSignature({
   );
 }
 
-// ── Status Config ────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<string, { color: string; bg: string; border: string; dot: string; variant: "success" | "warning" | "info" }> = {
-  Created: { color: "text-[#fbbf24]", bg: "bg-[#fbbf24]/10", border: "border-[#fbbf24]/20", dot: "bg-[#fbbf24]", variant: "warning" },
-  Shipped: { color: "text-[#4fc3f7]", bg: "bg-[#4fc3f7]/10", border: "border-[#4fc3f7]/20", dot: "bg-[#4fc3f7]", variant: "info" },
-  Delivered: { color: "text-[#34d399]", bg: "bg-[#34d399]/10", border: "border-[#34d399]/20", dot: "bg-[#34d399]", variant: "success" },
-};
-
 // ── Main Component ───────────────────────────────────────────
 
-type Tab = "track" | "add" | "update";
+type Tab = "status" | "create" | "join";
+
+interface PoolStatus {
+  total_bet_amount: bigint;
+  ticket_price: bigint;
+  participants_count: bigint;
+  is_closed: boolean;
+}
 
 interface ContractUIProps {
   walletAddress: string | null;
@@ -137,91 +133,92 @@ interface ContractUIProps {
 }
 
 export default function ContractUI({ walletAddress, onConnect, isConnecting }: ContractUIProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("track");
+  const [activeTab, setActiveTab] = useState<Tab>("status");
   const [error, setError] = useState<string | null>(null);
   const [txStatus, setTxStatus] = useState<string | null>(null);
 
-  const [addId, setAddId] = useState("");
-  const [addOrigin, setAddOrigin] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
+  const [poolDesc, setPoolDesc] = useState("");
+  const [ticketPrice, setTicketPrice] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
-  const [updateId, setUpdateId] = useState("");
-  const [updateStatusVal, setUpdateStatusVal] = useState("");
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
 
-  const [trackId, setTrackId] = useState("");
-  const [isTracking, setIsTracking] = useState(false);
-  const [productData, setProductData] = useState<Record<string, string> | null>(null);
+  const [poolData, setPoolData] = useState<PoolStatus | null>(null);
+  const [isLoadingStatus, setIsLoadingStatus] = useState(false);
 
   const truncate = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
-  const handleAddProduct = useCallback(async () => {
-    if (!walletAddress) return setError("Connect wallet first");
-    if (!addId.trim() || !addOrigin.trim()) return setError("Fill in all fields");
-    setError(null);
-    setIsAdding(true);
-    setTxStatus("Awaiting signature...");
+  const fetchStatus = useCallback(async () => {
+    setIsLoadingStatus(true);
     try {
-      await addProduct(walletAddress, addId.trim(), addOrigin.trim());
-      setTxStatus("Product registered on-chain!");
-      setAddId("");
-      setAddOrigin("");
-      setTimeout(() => setTxStatus(null), 5000);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Transaction failed");
-      setTxStatus(null);
-    } finally {
-      setIsAdding(false);
-    }
-  }, [walletAddress, addId, addOrigin]);
-
-  const handleUpdateStatus = useCallback(async () => {
-    if (!walletAddress) return setError("Connect wallet first");
-    if (!updateId.trim() || !updateStatusVal.trim()) return setError("Fill in all fields");
-    setError(null);
-    setIsUpdating(true);
-    setTxStatus("Awaiting signature...");
-    try {
-      await updateProductStatus(walletAddress, updateId.trim(), updateStatusVal.trim());
-      setTxStatus("Status updated on-chain!");
-      setUpdateId("");
-      setUpdateStatusVal("");
-      setTimeout(() => setTxStatus(null), 5000);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Transaction failed");
-      setTxStatus(null);
-    } finally {
-      setIsUpdating(false);
-    }
-  }, [walletAddress, updateId, updateStatusVal]);
-
-  const handleTrackProduct = useCallback(async () => {
-    if (!trackId.trim()) return setError("Enter a product ID");
-    setError(null);
-    setIsTracking(true);
-    setProductData(null);
-    try {
-      const result = await getProduct(trackId.trim(), walletAddress || undefined);
-      if (result && typeof result === "object") {
-        const mapped: Record<string, string> = {};
-        for (const [k, v] of Object.entries(result)) {
-          mapped[String(k)] = String(v);
-        }
-        setProductData(mapped);
-      } else {
-        setError("Product not found");
+      const status = await getPoolStatus(walletAddress || undefined);
+      if (status) {
+        setPoolData(status as unknown as PoolStatus);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Query failed");
+      console.error("Failed to fetch status", err);
     } finally {
-      setIsTracking(false);
+      setIsLoadingStatus(false);
     }
-  }, [trackId, walletAddress]);
+  }, [walletAddress]);
+
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
+
+  const handleCreatePool = useCallback(async () => {
+    if (!walletAddress) return setError("Connect wallet first");
+    if (!poolDesc.trim() || !ticketPrice.trim()) return setError("Fill in all fields");
+    setError(null);
+    setIsCreating(true);
+    setTxStatus("Awaiting signature...");
+    try {
+      await createPool(walletAddress, poolDesc.trim(), BigInt(ticketPrice));
+      setTxStatus("Pool created successfully!");
+      setPoolDesc("");
+      setTicketPrice("");
+      fetchStatus();
+      setTimeout(() => setTxStatus(null), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Account not found")) {
+        setError("Account not found on Testnet. You need to fund it first!");
+      } else {
+        setError(msg);
+      }
+      setTxStatus(null);
+    } finally {
+      setIsCreating(false);
+    }
+  }, [walletAddress, poolDesc, ticketPrice, fetchStatus]);
+
+  const handlePlaceBet = useCallback(async () => {
+    if (!walletAddress) return setError("Connect wallet first");
+    setError(null);
+    setIsJoining(true);
+    setTxStatus("Awaiting signature...");
+    try {
+      await placeBet(walletAddress, walletAddress);
+      setTxStatus("Bet placed successfully!");
+      fetchStatus();
+      setTimeout(() => setTxStatus(null), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Account not found")) {
+        setError("Account not found on Testnet. You need to fund it first!");
+      } else {
+        setError(msg);
+      }
+      setTxStatus(null);
+    } finally {
+      setIsJoining(false);
+    }
+  }, [walletAddress, fetchStatus]);
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode; color: string }[] = [
-    { key: "track", label: "Track", icon: <SearchIcon />, color: "#4fc3f7" },
-    { key: "add", label: "Register", icon: <PackageIcon />, color: "#7c6cf0" },
-    { key: "update", label: "Update", icon: <RefreshIcon />, color: "#fbbf24" },
+    { key: "status", label: "Pool Status", icon: <ChartIcon />, color: "#4fc3f7" },
+    { key: "create", label: "Create Pool", icon: <PoolIcon />, color: "#7c6cf0" },
+    { key: "join", label: "Join Pool", icon: <BetIcon />, color: "#34d399" },
   ];
 
   return (
@@ -233,6 +230,16 @@ export default function ContractUI({ walletAddress, onConnect, isConnecting }: C
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-[#f87171]/90">Error</p>
             <p className="text-xs text-[#f87171]/50 mt-0.5 break-all">{error}</p>
+            {error.includes("Account not found") && (
+              <a 
+                href={`https://laboratory.stellar.org/#account-creator?network=testnet&publicKey=${walletAddress}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-block text-[10px] font-bold uppercase tracking-widest text-[#4fc3f7] hover:underline"
+              >
+                Fund with Friendbot →
+              </a>
+            )}
           </div>
           <button onClick={() => setError(null)} className="shrink-0 text-[#f87171]/30 hover:text-[#f87171]/70 text-lg leading-none">&times;</button>
         </div>
@@ -241,7 +248,7 @@ export default function ContractUI({ walletAddress, onConnect, isConnecting }: C
       {txStatus && (
         <div className="mb-4 flex items-center gap-3 rounded-xl border border-[#34d399]/15 bg-[#34d399]/[0.05] px-4 py-3 backdrop-blur-sm shadow-[0_0_30px_rgba(52,211,153,0.05)] animate-slide-down">
           <span className="text-[#34d399]">
-            {txStatus.includes("on-chain") || txStatus.includes("updated") ? <CheckIcon /> : <SpinnerIcon />}
+            {txStatus.includes("successfully") ? <CheckIcon /> : <SpinnerIcon />}
           </span>
           <span className="text-sm text-[#34d399]/90">{txStatus}</span>
         </div>
@@ -254,20 +261,16 @@ export default function ContractUI({ walletAddress, onConnect, isConnecting }: C
           <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#7c6cf0]/20 to-[#4fc3f7]/20 border border-white/[0.06]">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7c6cf0]">
-                  <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" />
-                  <path d="M15 18H9" />
-                  <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14" />
-                  <circle cx="17" cy="18" r="2" />
-                  <circle cx="7" cy="18" r="2" />
-                </svg>
+                <PoolIcon />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white/90">Supply Chain Tracker</h3>
+                <h3 className="text-sm font-semibold text-white/90">Betting Pool Contract</h3>
                 <p className="text-[10px] text-white/25 font-mono mt-0.5">{truncate(CONTRACT_ADDRESS)}</p>
               </div>
             </div>
-            <Badge variant="info" className="text-[10px]">Soroban</Badge>
+            <Badge variant={poolData?.is_closed ? "warning" : "success"} className="text-[10px]">
+              {poolData?.is_closed ? "Closed" : "Active"}
+            </Badge>
           </div>
 
           {/* Tabs */}
@@ -275,7 +278,7 @@ export default function ContractUI({ walletAddress, onConnect, isConnecting }: C
             {tabs.map((t) => (
               <button
                 key={t.key}
-                onClick={() => { setActiveTab(t.key); setError(null); setProductData(null); }}
+                onClick={() => { setActiveTab(t.key); setError(null); }}
                 className={cn(
                   "relative flex items-center gap-2 px-5 py-3.5 text-sm font-medium transition-all",
                   activeTab === t.key ? "text-white/90" : "text-white/35 hover:text-white/55"
@@ -295,58 +298,56 @@ export default function ContractUI({ walletAddress, onConnect, isConnecting }: C
 
           {/* Tab Content */}
           <div className="p-6">
-            {/* Track */}
-            {activeTab === "track" && (
+            {/* Status */}
+            {activeTab === "status" && (
               <div className="space-y-5">
-                <MethodSignature name="get_product" params="(product_id: String)" returns="-> Map<Symbol, String>" color="#4fc3f7" />
-                <Input label="Product ID" value={trackId} onChange={(e) => setTrackId(e.target.value)} placeholder="e.g. PROD-001" />
-                <ShimmerButton onClick={handleTrackProduct} disabled={isTracking} shimmerColor="#4fc3f7" className="w-full">
-                  {isTracking ? <><SpinnerIcon /> Querying...</> : <><SearchIcon /> Track Product</>}
-                </ShimmerButton>
-
-                {productData && (
-                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden animate-fade-in-up">
-                    <div className="border-b border-white/[0.06] px-4 py-3 flex items-center justify-between">
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-white/25">Product Details</span>
-                      {(() => {
-                        const status = productData.status || "Unknown";
-                        const cfg = STATUS_CONFIG[status];
-                        return cfg ? (
-                          <Badge variant={cfg.variant}>
-                            <span className={cn("h-1.5 w-1.5 rounded-full", cfg.dot)} />
-                            {status}
-                          </Badge>
-                        ) : (
-                          <Badge>{status}</Badge>
-                        );
-                      })()}
-                    </div>
-                    <div className="p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-white/35">Product ID</span>
-                        <span className="font-mono text-sm text-white/80">{trackId}</span>
-                      </div>
-                      {Object.entries(productData).map(([key, val]) => (
-                        <div key={key} className="flex items-center justify-between">
-                          <span className="text-xs text-white/35 capitalize">{key}</span>
-                          <span className="font-mono text-sm text-white/80">{val}</span>
-                        </div>
-                      ))}
-                    </div>
+                <MethodSignature name="view_pool_status" params="()" returns="-> PoolStatus" color="#4fc3f7" />
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-center">
+                    <p className="text-[10px] uppercase tracking-widest text-white/20 mb-1">Total Pool</p>
+                    <p className="text-2xl font-bold text-white/90 font-mono">
+                      {poolData ? (Number(poolData.total_bet_amount) / 10000000).toFixed(2) : "0.00"} XLM
+                    </p>
                   </div>
-                )}
+                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-center">
+                    <p className="text-[10px] uppercase tracking-widest text-white/20 mb-1">Participants</p>
+                    <p className="text-2xl font-bold text-white/90 font-mono">
+                      {poolData ? Number(poolData.participants_count) : "0"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-center">
+                    <p className="text-[10px] uppercase tracking-widest text-white/20 mb-1">Ticket Price</p>
+                    <p className="text-xl font-bold text-white/70 font-mono">
+                      {poolData ? (Number(poolData.ticket_price) / 10000000).toFixed(2) : "0.00"} XLM
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-center">
+                    <p className="text-[10px] uppercase tracking-widest text-white/20 mb-1">Status</p>
+                    <p className={cn(
+                      "text-xl font-bold font-mono",
+                      poolData?.is_closed ? "text-[#fbbf24]" : "text-[#34d399]"
+                    )}>
+                      {poolData?.is_closed ? "LOCKED" : "OPEN"}
+                    </p>
+                  </div>
+                </div>
+
+                <ShimmerButton onClick={fetchStatus} disabled={isLoadingStatus} shimmerColor="#4fc3f7" className="w-full">
+                  {isLoadingStatus ? <><SpinnerIcon /> Updating...</> : <><ChartIcon /> Refresh Stats</>}
+                </ShimmerButton>
               </div>
             )}
 
-            {/* Add */}
-            {activeTab === "add" && (
+            {/* Create */}
+            {activeTab === "create" && (
               <div className="space-y-5">
-                <MethodSignature name="add_product" params="(product_id: String, origin: String)" color="#7c6cf0" />
-                <Input label="Product ID" value={addId} onChange={(e) => setAddId(e.target.value)} placeholder="e.g. PROD-001" />
-                <Input label="Origin" value={addOrigin} onChange={(e) => setAddOrigin(e.target.value)} placeholder="e.g. Factory A, Shanghai" />
+                <MethodSignature name="create_pool" params="(description: String, ticket_price: u128)" color="#7c6cf0" />
+                <Input label="Pool Description" value={poolDesc} onChange={(e) => setPoolDesc(e.target.value)} placeholder="e.g. World Cup Finals Winner" />
+                <Input label="Ticket Price (Stroops)" value={ticketPrice} onChange={(e) => setTicketPrice(e.target.value)} placeholder="e.g. 10000000 (1 XLM)" />
                 {walletAddress ? (
-                  <ShimmerButton onClick={handleAddProduct} disabled={isAdding} shimmerColor="#7c6cf0" className="w-full">
-                    {isAdding ? <><SpinnerIcon /> Registering...</> : <><PackageIcon /> Register Product</>}
+                  <ShimmerButton onClick={handleCreatePool} disabled={isCreating} shimmerColor="#7c6cf0" className="w-full">
+                    {isCreating ? <><SpinnerIcon /> Initializing...</> : <><PoolIcon /> Initialize Pool</>}
                   </ShimmerButton>
                 ) : (
                   <button
@@ -354,79 +355,48 @@ export default function ContractUI({ walletAddress, onConnect, isConnecting }: C
                     disabled={isConnecting}
                     className="w-full rounded-xl border border-dashed border-[#7c6cf0]/20 bg-[#7c6cf0]/[0.03] py-4 text-sm text-[#7c6cf0]/60 hover:border-[#7c6cf0]/30 hover:text-[#7c6cf0]/80 active:scale-[0.99] transition-all disabled:opacity-50"
                   >
-                    Connect wallet to register products
+                    Connect wallet to create pool
                   </button>
                 )}
               </div>
             )}
 
-            {/* Update */}
-            {activeTab === "update" && (
+            {/* Join */}
+            {activeTab === "join" && (
               <div className="space-y-5">
-                <MethodSignature name="update_status" params="(product_id: String, new_status: String)" color="#fbbf24" />
-                <Input label="Product ID" value={updateId} onChange={(e) => setUpdateId(e.target.value)} placeholder="e.g. PROD-001" />
-
-                <div className="space-y-2">
-                  <label className="block text-[11px] font-medium uppercase tracking-wider text-white/30">New Status</label>
-                  <div className="flex gap-2">
-                    {(["Shipped", "Delivered"] as const).map((s) => {
-                      const cfg = STATUS_CONFIG[s];
-                      const active = updateStatusVal === s;
-                      return (
-                        <button
-                          key={s}
-                          onClick={() => setUpdateStatusVal(s)}
-                          className={cn(
-                            "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all active:scale-95",
-                            active
-                              ? `${cfg.border} ${cfg.bg} ${cfg.color}`
-                              : "border-white/[0.06] bg-white/[0.02] text-white/35 hover:text-white/55 hover:border-white/[0.1]"
-                          )}
-                        >
-                          <span className={cn("h-1.5 w-1.5 rounded-full transition-colors", active ? cfg.dot : "bg-white/20")} />
-                          {s}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="group rounded-xl border border-white/[0.06] bg-white/[0.02] p-px transition-all focus-within:border-[#fbbf24]/30 focus-within:shadow-[0_0_20px_rgba(251,191,36,0.08)]">
-                    <input
-                      value={updateStatusVal}
-                      onChange={(e) => setUpdateStatusVal(e.target.value)}
-                      placeholder="Or type a custom status..."
-                      className="w-full rounded-[11px] bg-transparent px-4 py-3 font-mono text-sm text-white/90 placeholder:text-white/15 outline-none"
-                    />
-                  </div>
+                <MethodSignature name="place_bet" params="(participant: Address)" color="#34d399" />
+                <div className="rounded-xl border border-white/10 bg-[#34d399]/[0.03] p-6 text-center">
+                  <p className="text-sm text-white/50 mb-4">
+                    Ready to join the pool? The ticket price is fixed at 
+                    <span className="text-white/90 font-mono ml-1">
+                      {poolData ? (Number(poolData.ticket_price) / 10000000).toFixed(2) : "0.00"} XLM
+                    </span>.
+                  </p>
+                  {walletAddress ? (
+                    <ShimmerButton onClick={handlePlaceBet} disabled={isJoining || poolData?.is_closed} shimmerColor="#34d399" className="w-full">
+                      {isJoining ? <><SpinnerIcon /> Joining...</> : <><BetIcon /> Place My Bet</>}
+                    </ShimmerButton>
+                  ) : (
+                    <button
+                      onClick={onConnect}
+                      disabled={isConnecting}
+                      className="w-full rounded-xl border border-dashed border-[#34d399]/20 bg-[#34d399]/[0.03] py-4 text-sm text-[#34d399]/60 hover:border-[#34d399]/30 hover:text-[#34d399]/80 active:scale-[0.99] transition-all disabled:opacity-50"
+                    >
+                      Connect wallet to join pool
+                    </button>
+                  )}
                 </div>
-
-                {walletAddress ? (
-                  <ShimmerButton onClick={handleUpdateStatus} disabled={isUpdating} shimmerColor="#fbbf24" className="w-full">
-                    {isUpdating ? <><SpinnerIcon /> Updating...</> : <><RefreshIcon /> Update Status</>}
-                  </ShimmerButton>
-                ) : (
-                  <button
-                    onClick={onConnect}
-                    disabled={isConnecting}
-                    className="w-full rounded-xl border border-dashed border-[#fbbf24]/20 bg-[#fbbf24]/[0.03] py-4 text-sm text-[#fbbf24]/60 hover:border-[#fbbf24]/30 hover:text-[#fbbf24]/80 active:scale-[0.99] transition-all disabled:opacity-50"
-                  >
-                    Connect wallet to update status
-                  </button>
-                )}
               </div>
             )}
           </div>
 
           {/* Footer */}
           <div className="border-t border-white/[0.04] px-6 py-3 flex items-center justify-between">
-            <p className="text-[10px] text-white/15">Supply Chain Tracker &middot; Soroban</p>
-            <div className="flex items-center gap-2">
-              {["Created", "Shipped", "Delivered"].map((s, i) => (
-                <span key={s} className="flex items-center gap-1.5">
-                  <span className={cn("h-1 w-1 rounded-full", STATUS_CONFIG[s]?.dot ?? "bg-white/20")} />
-                  <span className="font-mono text-[9px] text-white/15">{s}</span>
-                  {i < 2 && <span className="text-white/10 text-[8px]">&rarr;</span>}
-                </span>
-              ))}
+            <p className="text-[10px] text-white/15">Betting Pool &middot; Soroban Smart Contract</p>
+            <div className="flex items-center gap-4 text-[10px] text-white/10">
+              <span>Testnet</span>
+              <span>Fixed Odds</span>
+              <span>Fully Auditable</span>
             </div>
           </div>
         </AnimatedCard>

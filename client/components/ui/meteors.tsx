@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { useState, useEffect } from "react";
 
 interface MeteorsProps {
   number?: number;
@@ -9,20 +9,21 @@ interface MeteorsProps {
 }
 
 export function Meteors({ number = 15, className }: MeteorsProps) {
-  const meteors = useMemo(
-    () =>
-      Array.from({ length: number }, (_, i) => ({
-        id: i,
-        left: `${Math.floor(Math.random() * 100)}%`,
-        delay: `${(Math.random() * 5).toFixed(1)}s`,
-        duration: `${(Math.random() * 3 + 2).toFixed(1)}s`,
-      })),
-    [number]
-  );
+  const [meteors, setMeteors] = useState<{ id: number; left: string; delay: string; duration: string }[]>([]);
+
+  useEffect(() => {
+    const meteorData = Array.from({ length: number }, (_, i) => ({
+      id: i,
+      left: `${Math.floor(Math.random() * 100)}%`,
+      delay: `${(Math.random() * 5).toFixed(1)}s`,
+      duration: `${(Math.random() * 3 + 2).toFixed(1)}s`,
+    }));
+    setMeteors(meteorData);
+  }, [number]);
 
   return (
     <>
-      {meteors.map((m) => (
+      {meteors.map((m: { id: number; left: string; delay: string; duration: string }) => (
         <span
           key={m.id}
           className={cn(

@@ -45,28 +45,24 @@ To get a local copy up and running, follow these simple steps.
 - [Node.js & npm](https://nodejs.org/en/download/)
 
 ### Setup
-1. Clone the repo:
+
+1. **Clone & Navigate**
    ```bash
    git clone https://github.com/RavikantiAkshay/my-stellar-project.git
+   cd my-stellar-project
    ```
-2. Navigate to the contract directory:
+
+2. **Smart Contract**
    ```bash
    cd contract
-   ```
-3. Build the contract:
-   ```bash
    cargo build --target wasm32-unknown-unknown --release
+   # Deploy as per Stellar docs
    ```
-4. Deploy the contract (to Testnet):
+
+3. **Frontend (Next.js)**
    ```bash
-   soroban contract deploy --wasm target/wasm32-unknown-unknown/release/betting_pool.wasm --source-account <YOUR_ACCOUNT> --rpc-url https://soroban-testnet.stellar.org:443 --network-passphrase "Test SDF Network ; September 2015"
-   ```
-5. Navigate to the client directory and install dependencies:
-   ```bash
-   cd ../client
+   # From the root directory:
+   cd client
    npm install
-   ```
-6. Run the client:
-   ```bash
-   npm start
+   npm run dev
    ```

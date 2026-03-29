@@ -77,15 +77,15 @@ export default function Home() {
 
           <h1 className="mb-3">
             <span className="block text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1]">
-              <span className="text-white">Supply Chain </span>
+              <span className="text-white">Next-Gen </span>
               <span className="bg-gradient-to-r from-[#7c6cf0] via-[#4fc3f7] to-[#7c6cf0] bg-[length:200%_auto] animate-gradient-shift bg-clip-text text-transparent">
-                on the Blockchain
+                Betting Pool
               </span>
             </span>
           </h1>
 
           <p className="mx-auto max-w-lg text-sm sm:text-base leading-relaxed text-white/40">
-            Register products, track shipments, and verify authenticity — immutably on Stellar.
+            Create transparent, decentralized prediction pools on Stellar. No bookmakers, no hidden fees — just trustless execution.
           </p>
 
           {/* Inline stats */}
@@ -110,17 +110,21 @@ export default function Home() {
           isConnecting={isConnecting}
         />
 
-        {/* Footer */}
-        <div className="mt-10 flex flex-col items-center gap-4 animate-fade-in">
-          {/* Supply chain flow */}
+        {/* Mascot / Decoration */}
+        <div className="mt-10 mb-6 flex flex-col items-center gap-4 animate-fade-in">
+          <img 
+            src="/assets/mascot.png" 
+            alt="Betting Pool Mascot" 
+            className="w-24 h-24 object-contain animate-float hover:scale-110 transition-transform duration-500"
+          />
           <div className="flex items-center gap-3 text-xs text-white/20">
-            {["Created", "Shipped", "Delivered"].map((step, i) => (
+            {["Create Pool", "Join", "Win"].map((step, i) => (
               <span key={step} className="flex items-center gap-3">
                 <span className="flex items-center gap-1.5">
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${
                       i === 0
-                        ? "bg-[#fbbf24]/50"
+                        ? "bg-[#7c6cf0]/50"
                         : i === 1
                           ? "bg-[#4fc3f7]/50"
                           : "bg-[#34d399]/50"
