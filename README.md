@@ -32,7 +32,6 @@ Deploy the smart contract to the Stellar Mainnet and host the frontend for publi
 - **Contract ID**: CBN57JBGP325YVQMVOKFOV5MIIVGOESMUEOZ5T6EZYCUHWAJRPDICOH6
 - **Contract Screenshot**: <img width="1908" height="883" alt="image" src="https://github.com/user-attachments/assets/e6441cc2-8044-45af-827f-5e624509ae45" />
 
-
 ## About Me
 I am a passionate blockchain developer with a background in decentralized systems and a deep interest in the Stellar ecosystem. My goal is to build tools that empower individuals through financial transparency. Having experienced the limitations of traditional wagering systems, I am dedicated to creating open-source solutions that are fair, secure, and accessible to everyone.
 
